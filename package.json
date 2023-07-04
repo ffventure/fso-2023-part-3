@@ -6,6 +6,8 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
+    "build:ui": "@powershell Remove-Item -Recurse -Force build && cd ../full-stack-open-2023/part-3/phonebook && npm run build && @powershell Copy-Item build -Recurse ../../../fso-2023-part-3",
+    "deploy:full": "npm run build:ui && git add . && git commit -m uibuild && git push",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "ffventure",

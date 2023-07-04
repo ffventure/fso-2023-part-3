@@ -15,6 +15,7 @@ morgan.token('person', function postPerson(req, res){
 
 
 app.use(express.json())
+app.use(express.static('build'))
 app.use(morgan(':method :url :status :res[content-length] - :response-time ms :person'))
 app.use(cors())
 
