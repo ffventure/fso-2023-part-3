@@ -1,5 +1,7 @@
+require('dotenv').config()
 const express = require('express')
 const morgan = require('morgan')
+const Person = require('./models/person')
 const cors = require('cors')
 const app = express()
 
@@ -13,81 +15,81 @@ morgan.token('person', function postPerson(req, res){
   }
 })
 
+const errorHandler = (error, request, response, next) => {
+  console.error(error.message)
+  if (error.name === "CastError") {
+    return response.status(400).send({ error: 'malformatted id' })
+  } else if (error.name === "ValidationError") {
+    return response.status(400).json({error: error.message})
+  }
+
+  next(error)
+}
 
 app.use(express.json())
 app.use(express.static('build'))
 app.use(morgan(':method :url :status :res[content-length] - :response-time ms :person'))
 app.use(cors())
-
-let persons = [
-  { 
-    "id": 1,
-    "name": "Arto Hellas", 
-    "number": "040-123456"
-  },
-  { 
-    "id": 2,
-    "name": "Ada Lovelace", 
-    "number": "39-44-5323523"
-  },
-  { 
-    "id": 3,
-    "name": "Dan Abramov", 
-    "number": "12-43-234345"
-  },
-  { 
-    "id": 4,
-    "name": "Mary Poppendieck", 
-    "number": "39-23-6423122"
-  }
-]
+app.use(errorHandler)
 
 app.get('/api/info', (request, response) => {
-  const numberOfPersons = persons.length
-  const currentTime = new Date()
-  response.send(`
-    <p>The phonebook contains ${numberOfPersons} entries.</p>
-    <p>Time of the reuquest: ${currentTime}</p>`)
+  Person.estimatedDocumentCount().then(count => {
+    const numberOfPersons = count
+    const currentTime = new Date()
+    response.send(`
+      <p>The phonebook contains ${numberOfPersons} entries.</p>
+      <p>Time of the reuquest: ${currentTime}</p>`)
+  })
 })
 
 app.get('/api/persons', (request, response) => {
-  response.json(persons)
+  Person.find({}).then(persons => {
+    response.json(persons)
+  })
 }) 
 
-app.get('/api/persons/:id', (request, response) => {
-  const person = persons.find(person => person.id === Number(request.params.id))
-  if (person) {
-    response.json(person)
-  }
-  else {
-    response.status(404).end()
-  }
+app.get('/api/persons/:id', (request, response, next) => {
+  Person.findById(request.params.id).then(person => {
+    if(person) {
+      const foundPerson = {
+        name: person.name,
+        number: person.number,
+        id: person._id
+      }
+      response.json(foundPerson)
+    } else {
+      response.status(404).end()
+    }
+  }).catch(error => next(error))
 }) 
 
-app.delete('/api/persons/:id', (request, response) => {
-  persons = persons.filter(person => person.id !== Number(request.params.id))
-  response.status(204).end()
+app.delete('/api/persons/:id', (request, response, next) => {
+  Person.findByIdAndRemove(request.params.id).then(person => {
+    response.status(204).end()
+  }).catch(error => next(error))
 })
 
-app.post('/api/persons', (request, response) => {
+app.post('/api/persons', (request, response, next) => {
   const body = request.body
   if(!body.name || body.name.trim() === "" || !body.number || body.number.trim() === "") {
     return response.status(400).json({error: "The name and the number fields are required."})
   }
-  if(persons.find(person => person.name === body.name)) {
-    return response.status(400).json({error: `${body.name} is already in the phonebook.`})
-  }
-  let id = Math.floor(Math.random() * 1000000)
-  if (persons.find(person => person.id === id)) {
-    return response.status(400).json({error: `Generated person id ${id} is already in the phonebook. Unlucky.`})
-  }
-  const person = {
-    id: id,
+  const person = new Person({
     name: body.name,
     number: body.number
-  }
-  persons = persons.concat(person)
-  response.json(person)
+  })
+  person.save().then(savedPerson => {
+    response.json(savedPerson)
+  }).catch(error => next(error))
+})
+
+app.put('/api/persons/:id', (request, response, next) => {
+  const person = ({
+    name: request.body.name,
+    number: request.body.number
+  })
+  console.log(request.params.id)
+  Person.findByIdAndUpdate(request.params.id, person, {new: true, runValidators: true}).then().catch(error => next(error))
 })
 
 const PORT = process.env.PORT || 3001
