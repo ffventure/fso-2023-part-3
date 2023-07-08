@@ -3,7 +3,7 @@ const express = require('express')
 const morgan = require('morgan')
 const cors = require('cors')
 const Person = require('./models/person')
-const errorHandler = require('./errorHandler')
+const errorHandler = require('./error-handler')
 
 const app = express()
 
@@ -76,13 +76,13 @@ app.put('/api/persons/:id', (request, response, next) => {
   console.log(request.params.id)
   Person.findByIdAndUpdate(request.params.id, person, { new: true, runValidators: true, context: 'query' }).then((foundPerson) => {
     if (Object.is(foundPerson, null)) {
-      throw { name: 'UpdateError', message: 'Update failed: object was already deleted from the database. Fetch current data by refreshing the page.' }
+      throw new Error(errorHandler.updateErrorMessage)
     }
     response.json(foundPerson)
   }).catch((error) => next(error))
 })
 
-app.use(errorHandler)
+app.use(errorHandler.errorHandler)
 const PORT = process.env.PORT || 3001
 app.listen(PORT)
 console.log(`Server running on port ${PORT}`)
